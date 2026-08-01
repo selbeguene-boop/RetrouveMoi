@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Item;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ItemController extends Controller
 {
@@ -15,34 +16,40 @@ class ItemController extends Controller
 
 
     // Ajouter un objet
-    public function store(Request $request)
-    {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'image' => 'nullable|string',
-            'status' => 'required|in:perdu,trouve',
-            'location' => 'required|string',
-            'date' => 'required|date',
-            'category_id' => 'required|exists:categories,id',
-        ]);
+  public function store(Request $request)
+{
+    $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+        'image' => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
+        'status' => 'required|in:perdu,trouve',
+        'location' => 'required|string',
+        'date' => 'required|date',
+        'category_id' => 'required|exists:categories,id',
+    ]);
 
-        $item = Item::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'image' => $request->image,
-            'status' => $request->status,
-            'location' => $request->location,
-            'date' => $request->date,
-            'category_id' => $request->category_id,
-            'user_id' => auth()->id(),
-        ]);
+    $imagePath = null;
 
-        return response()->json([
-            'message' => 'Objet ajouté avec succès',
-            'item' => $item
-        ], 201);
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('items', 'public');
     }
+
+    $item = Item::create([
+        'title' => $request->title,
+        'description' => $request->description,
+        'image' => $imagePath,
+        'status' => $request->status,
+        'location' => $request->location,
+        'date' => $request->date,
+        'category_id' => $request->category_id,
+        'user_id' => auth()->id(),
+    ]);
+
+    return response()->json([
+        'message' => 'Objet ajouté avec succès',
+        'item' => $item
+    ], 201);
+}
 
 
     // Afficher un objet
@@ -56,19 +63,29 @@ class ItemController extends Controller
 public function update(Request $request, Item $item)
 {
     $request->validate([
-        'title' => 'required|string|max:255',
-        'description' => 'required|string',
-        'status' => 'required|in:perdu,trouve',
-        'location' => 'required|string',
-    ]);
+    'title' => 'required|string|max:255',
+    'description' => 'required|string',
+    'image' => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
+    'status' => 'required|in:perdu,trouve',
+    'location' => 'required|string',
+]);
+$imagePath = $item->image;
 
-    $item->update([
-        'title' => $request->title,
-        'description' => $request->description,
-        'status' => $request->status,
-        'location' => $request->location,
-    ]);
+if ($request->hasFile('image')) {
 
+    if ($item->image && Storage::disk('public')->exists($item->image)) {
+        Storage::disk('public')->delete($item->image);
+    }
+
+    $imagePath = $request->file('image')->store('items', 'public');
+}
+       $item->update([
+    'title' => $request->title,
+    'description' => $request->description,
+    'image' => $imagePath,
+    'status' => $request->status,
+    'location' => $request->location,
+]);
     return response()->json([
         'message' => 'Objet modifié avec succès',
         'item' => $item->fresh()
